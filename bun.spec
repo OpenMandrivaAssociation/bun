@@ -62,6 +62,7 @@ BuildRequires:	esbuild
 BuildRequires:	python
 BuildRequires:	ruby
 BuildRequires:	perl
+BuildRequires:	perl-JSON-PP
 BuildRequires:	pkgconfig(icu-uc)
 BuildRequires:	pkgconfig(icu-i18n)
 BuildRequires:	pkgconfig(zlib)
