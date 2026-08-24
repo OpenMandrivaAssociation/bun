@@ -1,0 +1,15 @@
+--- a/scripts/build/tools.ts
++++ b/scripts/build/tools.ts
+@@ -267,7 +267,12 @@
+ export const LLVM_VERSION = "21.1.8";
+ const LLVM_MAJOR = "21";
+ const LLVM_MINOR = "1";
+-const LLVM_VERSION_RANGE = `>=${LLVM_MAJOR}.${LLVM_MINOR}.0 <${LLVM_MAJOR}.${LLVM_MINOR}.99`;
++// Upstream pins 21.1.x so a locally-built bun matches their prebuilt
++// WebKit ABI. We compile oven-sh/WebKit ourselves with the same clang
++// (--profile=release-local), so the allocator/layout mismatch that pin
++// exists to prevent does not apply. OpenMandriva currently ships LLVM 23.
++const LLVM_VERSION_RANGE = `>=21.1.0 <24.0.0`;
+ 
+ /**
+  * Known LLVM install locations per platform. Call ONCE from

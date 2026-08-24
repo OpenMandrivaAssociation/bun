@@ -1,0 +1,30 @@
+--- a/scripts/build/download.ts
++++ b/scripts/build/download.ts
+@@ -189,6 +189,16 @@
+     return;
+   }
+ 
++  // Distro / ABF builds have no network. Prefetch miss must not fall
++  // through to fetch() (10 attempts, ~3 minutes of timeouts per URL).
++  if (process.env.BUN_BUILD_OFFLINE) {
++    throw new BuildError(`offline build: no prefetch entry for ${url}`, {
++      hint:
++        "Put the tarball at $BUN_BUILD_PREFETCH_DIR/by-url/<sha256(url)[:32]> " +
++        "(see vendor-sources.sh). The build will not download.",
++    });
++  }
++
+   const maxAttempts = retry.attempts;
+   let lastError: unknown;
+   let permanent = false;
+--- a/scripts/build/deps/webkit.ts
++++ b/scripts/build/deps/webkit.ts
+@@ -334,6 +334,8 @@
+       ENABLE_REMOTE_INSPECTOR: "ON",
+       ENABLE_MEDIA_SOURCE: "OFF",
+       ENABLE_MEDIA_STREAM: "OFF",
+       ENABLE_WEB_RTC: "OFF",
++      // CMake FetchContent must not hit the network in ABF.
++      FETCHCONTENT_FULLY_DISCONNECTED: "ON",
+       ...(cfg.asan ? { ENABLE_SANITIZERS: "address" } : {}),
+     };
