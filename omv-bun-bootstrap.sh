@@ -11,10 +11,46 @@
 // It is a build-time tool only. The package we produce is a real bun.
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const args = process.argv.slice(2);
+
+// Configure-time bindgenv2 --command=list-outputs. The real script uses
+// import.meta.require + a "bindgenv2" path alias (Bun-only). Unions emit
+// a header; dictionaries and enumerations emit header+source.
+function bindgenv2ListOutputs(argv) {
+	let codegenPath = "";
+	let sources = [];
+	for (const a of argv) {
+		if (a.startsWith("--codegen-path=")) codegenPath = a.slice("--codegen-path=".length);
+		else if (a.startsWith("--sources=")) sources = a.slice("--sources=".length).split(",").filter(Boolean);
+	}
+	if (!codegenPath || sources.length === 0) return false;
+	const out = [];
+	const unionRe = /\.union\(\s*"([A-Za-z][A-Za-z0-9_]*)"/g;
+	const enumRe = /\.enumeration\(\s*"([A-Za-z][A-Za-z0-9_]*)"/g;
+	const dictRe = /\.dictionary\(\s*\{[^}]*?\bname:\s*"([A-Za-z][A-Za-z0-9_]*)"/gs;
+	for (const file of sources) {
+		const text = readFileSync(file, "utf8");
+		for (const re of [unionRe]) {
+			re.lastIndex = 0;
+			let m;
+			while ((m = re.exec(text))) out.push(`${codegenPath}/Generated${m[1]}.h`);
+		}
+		for (const re of [enumRe, dictRe]) {
+			re.lastIndex = 0;
+			let m;
+			while ((m = re.exec(text))) {
+				out.push(`${codegenPath}/Generated${m[1]}.h`);
+				out.push(`${codegenPath}/Generated${m[1]}.cpp`);
+			}
+		}
+	}
+	if (out.length === 0) return false;
+	process.stdout.write(out.join(";"));
+	return true;
+}
 
 function runNodeOn(scriptAndArgs) {
 	const r = spawnSync(
@@ -49,6 +85,9 @@ if (args[0] === "run") {
 
 // `bun <file.ts> ...` or leftover after stripping `run`
 if (args[0] && (args[0].endsWith(".ts") || args[0].endsWith(".mjs") || args[0].endsWith(".js"))) {
+	if (args.some(a => a === "--command=list-outputs" || a.startsWith("--command=list-outputs"))) {
+		if (bindgenv2ListOutputs(args)) process.exit(0);
+	}
 	runNodeOn(args);
 }
 
