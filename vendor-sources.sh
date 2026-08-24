@@ -146,7 +146,6 @@ if [ ! -f "$WK" ]; then
 	cp -a "$CLONE/CMakeLists.txt" "$SLIM/"
 	cp -a "$CLONE/Source/CMakeLists.txt" "$CLONE/Source/cmake" "$SLIM/Source/"
 	cp -a "$CLONE/Source/JavaScriptCore" "$CLONE/Source/WTF" "$CLONE/Source/bmalloc" "$SLIM/Source/"
-	cp -a "$CLONE/Source/ThirdParty/unifdef" "$SLIM/Source/ThirdParty/"
 	for f in ReadMe.md jsc.md CMakePresets.json; do
 		[ -f "$CLONE/$f" ] && cp -a "$CLONE/$f" "$SLIM/"
 	done

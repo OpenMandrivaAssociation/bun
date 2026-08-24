@@ -54,6 +54,7 @@ BuildRequires:	lld
 BuildRequires:	cmake
 BuildRequires:	ninja
 BuildRequires:	make
+BuildRequires:	unifdef
 BuildRequires:	rust
 BuildRequires:	cargo
 BuildRequires:	nodejs
@@ -134,6 +135,7 @@ fi
 sed -i \
 	-e '/ENABLE_WEB_RTC: "OFF",/a\      FETCHCONTENT_FULLY_DISCONNECTED: "ON",' \
 	-e '/ENABLE_WEB_RTC: "OFF",/a\      ENABLE_API_TESTS: "OFF",' \
+	-e '/ENABLE_WEB_RTC: "OFF",/a\      USE_SYSTEM_UNIFDEF: "ON",' \
 	scripts/build/deps/webkit.ts
 
 # Node headers prefetch: same by-url scheme. vendor-sources.sh also
