@@ -130,11 +130,27 @@ if [ ! -f "$HERE/node-v${NODEJS_HEADERS_VERSION}-headers.tar.gz" ]; then
 		"https://nodejs.org/dist/v${NODEJS_HEADERS_VERSION}/node-v${NODEJS_HEADERS_VERSION}-headers.tar.gz"
 fi
 
-echo "==> WebKit source @ ${WEBKIT_VERSION}"
-WK="$HERE/WebKit-${WEBKIT_VERSION}.tar.gz"
+echo "==> JSC-only WebKit @ ${WEBKIT_VERSION}"
+# GitHub archive of oven-sh/WebKit is ~2G (422s or multi-hour). PORT=JSCOnly
+# only compiles JavaScriptCore + WTF + bmalloc + unifdef. Clone, slice, xz.
+WK="$HERE/WebKit-jsc-only-${WEBKIT_VERSION}.tar.xz"
 if [ ! -f "$WK" ]; then
-	curl -fL -o "$WK" \
-		"https://github.com/oven-sh/WebKit/archive/${WEBKIT_VERSION}/WebKit-${WEBKIT_VERSION}.tar.gz"
+	CLONE="$WORKDIR/webkit-clone"
+	git clone --depth 1 https://github.com/oven-sh/WebKit.git "$CLONE"
+	if [ "$(git -C "$CLONE" rev-parse HEAD)" != "$WEBKIT_VERSION" ]; then
+		git -C "$CLONE" fetch --depth 1 origin "$WEBKIT_VERSION"
+		git -C "$CLONE" checkout --detach "$WEBKIT_VERSION"
+	fi
+	SLIM="$WORKDIR/webkit-jsc-only/WebKit"
+	mkdir -p "$SLIM/Source/ThirdParty"
+	cp -a "$CLONE/CMakeLists.txt" "$SLIM/"
+	cp -a "$CLONE/Source/CMakeLists.txt" "$CLONE/Source/cmake" "$SLIM/Source/"
+	cp -a "$CLONE/Source/JavaScriptCore" "$CLONE/Source/WTF" "$CLONE/Source/bmalloc" "$SLIM/Source/"
+	cp -a "$CLONE/Source/ThirdParty/unifdef" "$SLIM/Source/ThirdParty/"
+	for f in ReadMe.md jsc.md CMakePresets.json; do
+		[ -f "$CLONE/$f" ] && cp -a "$CLONE/$f" "$SLIM/"
+	done
+	tar -C "$WORKDIR/webkit-jsc-only" -cJf "$WK" WebKit
 fi
 
 echo
@@ -145,5 +161,5 @@ echo "  $HERE/bun-${VERSION}-npm-vendor.tar.xz"
 echo "  $HERE/bun-${VERSION}-prefetch.tar.xz"
 echo "  $WK"
 echo "  $HERE/node-v${NODEJS_HEADERS_VERSION}-headers.tar.gz"
-echo "  $HERE/omv-bun-bootstrap.mjs"
+echo "  $HERE/omv-bun-bootstrap.sh"
 echo "  $HERE/bun-llvm-version.patch"

@@ -38,9 +38,10 @@ Source1:	bun-%{version}-cargo-vendor.tar.xz
 Source2:	bun-%{version}-npm-vendor.tar.xz
 # BUN_BUILD_PREFETCH_DIR layout: github-archive snapshots of C deps
 Source3:	bun-%{version}-prefetch.tar.xz
-# oven-sh/WebKit at the commit pinned in scripts/build/deps/webkit.ts
-# (WEBKIT_VERSION). Do not use the prebuilt bun-webkit-*.tar.gz releases.
-Source4:	WebKit-0f966e81b78c84bb23213e391bc679c4ef83e56b.tar.gz
+# JSC-only slice of oven-sh/WebKit at WEBKIT_VERSION (see vendor-sources.sh).
+# Full WebKit is ~8G / 1.9G compressed; bun's PORT=JSCOnly only compiles
+# JavaScriptCore + WTF + bmalloc + unifdef (~110M / 9M xz).
+Source4:	WebKit-jsc-only-0f966e81b78c84bb23213e391bc679c4ef83e56b.tar.xz
 # node headers bun embeds for process.versions / N-API (nodejs.org source)
 Source5:	https://nodejs.org/dist/v26.3.0/node-v26.3.0-headers.tar.gz
 Source6:	omv-bun-bootstrap.sh
@@ -129,7 +130,10 @@ if [ -d "$wk" ] && [ "$wk" != "vendor/WebKit" ]; then
 fi
 
 # Keep CMake FetchContent from trying the network (WebKit).
-sed -i '/ENABLE_WEB_RTC: "OFF",/a\      FETCHCONTENT_FULLY_DISCONNECTED: "ON",' \
+# ENABLE_API_TESTS would pull gtest, which the slim tree does not ship.
+sed -i \
+	-e '/ENABLE_WEB_RTC: "OFF",/a\      FETCHCONTENT_FULLY_DISCONNECTED: "ON",' \
+	-e '/ENABLE_WEB_RTC: "OFF",/a\      ENABLE_API_TESTS: "OFF",' \
 	scripts/build/deps/webkit.ts
 
 # Node headers prefetch: same by-url scheme. vendor-sources.sh also
