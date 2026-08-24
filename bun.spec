@@ -1,7 +1,7 @@
 # bun 1.4 is Rust + JavaScriptCore. Official builds download a previous bun
 # binary and a prebuilt WebKit tarball. That is unacceptable here:
 # everything must be compiled from source (Thompson trust) and ABF has no
-# network in %build.
+# network during the rpm build.
 #
 # Bootstrap:
 #   * configure/codegen run under Node 22+ type-stripping
@@ -92,7 +92,7 @@ prebuilt bun or bun-webkit binaries published by upstream.
 %autosetup -p1 -n bun-bun-v%{version}
 
 # System rustc. The pin is a rustup nightly; ABF has no rustup and we
-# refuse to download one. RUSTC_BOOTSTRAP is set in %build.
+# refuse to download one. RUSTC_BOOTSTRAP is set in the build phase.
 rm -f rust-toolchain.toml
 
 # Cargo vendor (must not unpack over vendor/ — that is lolhtml/rust-argon2)
@@ -127,6 +127,10 @@ wk=$(echo vendor/WebKit-* vendor/oven-sh-WebKit-* 2>/dev/null | awk '{print $1}'
 if [ -d "$wk" ] && [ "$wk" != "vendor/WebKit" ]; then
 	mv "$wk" vendor/WebKit
 fi
+
+# Keep CMake FetchContent from trying the network (WebKit).
+sed -i '/ENABLE_WEB_RTC: "OFF",/a\      FETCHCONTENT_FULLY_DISCONNECTED: "ON",' \
+	scripts/build/deps/webkit.ts
 
 # Node headers prefetch: same by-url scheme. vendor-sources.sh also
 # drops the tarball into the prefetch tree; keep Source5 as a documented

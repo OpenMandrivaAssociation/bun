@@ -17,14 +17,3 @@
    const maxAttempts = retry.attempts;
    let lastError: unknown;
    let permanent = false;
---- a/scripts/build/deps/webkit.ts
-+++ b/scripts/build/deps/webkit.ts
-@@ -334,6 +334,8 @@
-       ENABLE_REMOTE_INSPECTOR: "ON",
-       ENABLE_MEDIA_SOURCE: "OFF",
-       ENABLE_MEDIA_STREAM: "OFF",
-       ENABLE_WEB_RTC: "OFF",
-+      // CMake FetchContent must not hit the network in ABF.
-+      FETCHCONTENT_FULLY_DISCONNECTED: "ON",
-       ...(cfg.asan ? { ENABLE_SANITIZERS: "address" } : {}),
-     };

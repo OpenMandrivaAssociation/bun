@@ -1,6 +1,6 @@
 --- a/scripts/build/tools.ts
 +++ b/scripts/build/tools.ts
-@@ -267,7 +267,12 @@
+@@ -267,7 +267,11 @@
  export const LLVM_VERSION = "21.1.8";
  const LLVM_MAJOR = "21";
  const LLVM_MINOR = "1";
