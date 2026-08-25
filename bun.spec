@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	3
+Release:	4
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -281,7 +281,7 @@ find build/release -name 'libJavaScriptCore.a' -o -name 'libWTF.a' -o -name 'lib
 # node:fs used to ship with a leftover `export default` inside the IIFE
 # (esbuild --format=esm vs bun's own bundler). That makes require("fs")
 # throw at builtin-compile time.
-%{buildroot}%{_bindir}/bun -e 'const fs=require("fs"); if (typeof fs.readFileSync !== "function") throw new Error("fs.readFileSync missing, keys="+Object.keys(fs)); require("path"); require("module"); console.log("node-builtins-ok")'
+%{buildroot}%{_bindir}/bun -e 'const fs=require("fs"); if (typeof fs.readFileSync !== "function") throw new Error("fs.readFileSync missing, keys="+Object.keys(fs)); require("path"); const {createRequire}=require("module"); createRequire("/usr/bin/bun"); console.log("node-builtins-ok")'
 
 %files
 %license LICENSE.md

@@ -527,6 +527,10 @@ function unwrapEsbuildCommonJS(js) {
   return ret !== void 0 ? ret : box.exports;
 };`,
 	);
+	// esbuild quotes bun intrinsics (`@undefined` is not valid JS). The
+	// builtin compiler wants the @-identifier. Quoted "@undefined" made
+	// require() pass options.paths = "@undefined" (a string).
+	js = js.replace(/"@undefined"/g, "@undefined");
 	return js.replace(/export default /g, "return ");
 }
 
