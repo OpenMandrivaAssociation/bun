@@ -121,6 +121,7 @@ sed -i \
 # clang 23: RETURN_IF_EXCEPTION({},) in void lambdas; highway SVE lacks
 # BitsFromMask; attribute-alias on highway_memmem vs memmem.
 sed -i \
+	-e 's/"-Werror=return-type",/"-Wno-return-type",/' \
 	-e 's/"-Werror",/"-Werror", "-Wno-error=return-type", "-Wno-error=attribute-alias",/' \
 	-e 's/"-Wno-character-conversion",/"-Wno-character-conversion", "-DHWY_COMPILE_ONLY_STATIC",/' \
 	scripts/build/flags.ts
