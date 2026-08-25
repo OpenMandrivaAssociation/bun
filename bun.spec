@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	12
+Release:	13
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -295,8 +295,8 @@ rm -f "$_reqjs"
 # need --minify-syntax so dead $bundleError() is DCE'd. Builtins are
 # left unminified. --define Promise=__intrinsic__Promise must stay an
 # identifier (a quoted string made Symbol.species not a constructor).
-# Enum maps such as $LoaderLabelToId must stay object/array literals or
-# Bun.build plugins throw "Loader js is not supported".
+# Enum maps such as $LoaderLabelToId are inlined after esbuild (esbuild
+# --define of an object emits a helper outside $$capture_start$$).
 # typeof Bun.$ is not enough — the tagged template is the real test.
 %{buildroot}%{_bindir}/bun -e 'if (typeof Bun.$ !== "function") throw new Error("Bun.$ missing"); console.log("shell-ok")'
 %{buildroot}%{_bindir}/bun -e 'const out = await Bun.$`echo species-ok`.text(); if (!String(out).includes("species-ok")) throw new Error("Bun.$ output: "+out); console.log("shell-run-ok")'

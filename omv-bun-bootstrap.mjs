@@ -242,9 +242,16 @@ function esbuildBuild(opts) {
 			if (opts.minify.keepNames) args.push("--keep-names");
 		}
 	}
+	// Object/array --define values ($LoaderLabelToId = {"js":2,...})
+	// make esbuild emit `var define_*_default = {...}` outside
+	// $$capture_start$$, so JSC builtins cannot see them. Inline
+	// those after the bundle instead.
+	const lateDefines = [];
 	if (opts.define) {
 		for (const [k, v] of Object.entries(opts.define)) {
-			args.push(`--define:${k}=${asEsbuildDefineValue(v)}`);
+			const lit = asEsbuildDefineValue(v);
+			if (/^[\[{]/.test(String(lit).trim())) lateDefines.push([k, String(lit)]);
+			else args.push(`--define:${k}=${lit}`);
 		}
 	}
 	if (opts.drop) {
@@ -268,6 +275,13 @@ function esbuildBuild(opts) {
 			outputs: [],
 			logs: [new Error(r.stderr || r.stdout || "esbuild failed")],
 		};
+	}
+	if (lateDefines.length) {
+		const rewrite = p => {
+			writeFileSync(p, applyLateDefines(readFileSync(p, "utf8"), lateDefines));
+		};
+		if (outdir) walkJsFiles(outdir, rewrite);
+		else if (outfileIdx !== -1) rewrite(args[outfileIdx].slice("--outfile=".length));
 	}
 	const outputs = [];
 	if (outdir) {
@@ -513,6 +527,14 @@ function asEsbuildDefineValue(v) {
 		return t;
 	}
 	return JSON.stringify(v);
+}
+
+function applyLateDefines(js, lateDefines) {
+	for (const [k, lit] of lateDefines) {
+		const re = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g");
+		js = js.replace(re, lit);
+	}
+	return js;
 }
 
 function bunDefineToEsbuild(spec) {
