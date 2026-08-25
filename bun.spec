@@ -122,7 +122,7 @@ sed -i \
 # BitsFromMask; attribute-alias on highway_memmem vs memmem.
 sed -i \
 	-e 's/"-Werror",/"-Werror", "-Wno-error=return-type", "-Wno-error=attribute-alias",/' \
-	-e 's/"-Wno-character-conversion",/"-Wno-character-conversion", "-DHWY_DISABLED_TARGETS=(HWY_SVE|HWY_SVE2|HWY_SVE_256)",/' \
+	-e 's/"-Wno-character-conversion",/"-Wno-character-conversion", "-DHWY_COMPILE_ONLY_STATIC",/' \
 	scripts/build/flags.ts
 
 # Cargo vendor (must not unpack over vendor/ — that is lolhtml/rust-argon2)
