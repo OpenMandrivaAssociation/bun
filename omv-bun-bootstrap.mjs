@@ -523,6 +523,7 @@ function bunBuildCli(argv) {
 	// --bundle wraps the same file in __commonJS and then `return require_X()`
 	// yields mod.exports === {} (the callback's `return $` is ignored).
 	let targetBun = false;
+	const externals = [];
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === "--minify") args.push("--minify");
@@ -543,9 +544,9 @@ function bunBuildCli(argv) {
 		else if (a.startsWith("--outfile=")) outfile = a.slice("--outfile=".length);
 		else if (a === "--root") root = argv[++i];
 		else if (a.startsWith("--root=")) root = a.slice("--root=".length);
-		else if (a === "--external") args.push("--external:" + argv[++i]);
-		else if (a.startsWith("--external=")) args.push("--external:" + a.slice("--external=".length));
-		else if (a.startsWith("--external:")) args.push(a);
+		else if (a === "--external") externals.push("--external:" + argv[++i]);
+		else if (a.startsWith("--external=")) externals.push("--external:" + a.slice("--external=".length));
+		else if (a.startsWith("--external:")) externals.push(a);
 		else if (a === "--define") args.push(bunDefineToEsbuild(argv[++i]));
 		else if (a.startsWith("--define=")) args.push(bunDefineToEsbuild(a.slice("--define=".length)));
 		else if (a === "--format") format = argv[++i];
@@ -555,7 +556,9 @@ function bunBuildCli(argv) {
 		} else entries.push(a);
 	}
 	args.push(...entries, "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
-	if (!targetBun) args.push("--bundle");
+	if (!targetBun) {
+		args.push("--bundle", ...externals);
+	}
 	if (outdir) args.push("--outdir=" + outdir);
 	if (outfile) args.push("--outfile=" + outfile);
 	if (root) args.push("--outbase=" + root);
