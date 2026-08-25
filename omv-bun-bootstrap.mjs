@@ -514,40 +514,20 @@ function bunDefineToEsbuild(spec) {
 // esbuild --bundle --format=esm wraps a bun builtin as:
 //   var require_X = __commonJS({ "file"(exports) { var $; ...; return $ } });
 //   export default require_X();
-// __commonJS ignores the callback return and yields mod.exports === {}.
-// Official bun's bundler just uses the inner body as the module factory.
+// Stock __commonJS ignores the callback return and yields mod.exports === {}.
+// Prefer the callback return (bun's $ exports object) and turn
+// `export default` into the IIFE return.
 function unwrapEsbuildCommonJS(js) {
-	const end = js.search(/\n(?:export default |return )require_\w+\(\);\s*$/);
-	if (end < 0) return js.replace(/export default /g, "return ");
-	const marker = js.indexOf("__commonJS({");
-	if (marker < 0) return js.replace(/export default /g, "return ");
-	const args = js.indexOf("(exports)", marker);
-	if (args < 0) return js.replace(/export default /g, "return ");
-	const open = js.indexOf("{", args);
-	if (open < 0) return js.replace(/export default /g, "return ");
-	let depth = 0;
-	let close = -1;
-	let quote = "";
-	for (let i = open; i < end; i++) {
-		const c = js[i];
-		if (quote) {
-			if (c === "\\" ) { i++; continue; }
-			if (c === quote) quote = "";
-			continue;
-		}
-		if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
-		if (c === "{") depth++;
-		else if (c === "}") {
-			depth--;
-			if (depth === 0) { close = i; break; }
-		}
-	}
-	if (close <= open) return js.replace(/export default /g, "return ");
-	let body = js.slice(open + 1, close).trim() + "\n";
-	// esbuild --define leftovers: empty __esm init fns live outside
-	// __commonJS. The calls are no-ops; without the helpers they throw.
-	body = body.replace(/init_define_intrinsic_\w+\(\);\s*/g, "");
-	return body;
+	js = js.replace(
+		/var __commonJS = \(cb, mod\) => function\(\) \{[\s\S]*?\n\};/,
+		`var __commonJS = (cb, mod) => function() {
+  var box = { exports: {} };
+  var names = Object.getOwnPropertyNames(cb);
+  var ret = names.length ? (0, cb[names[0]])(box.exports, box) : void 0;
+  return ret !== void 0 ? ret : box.exports;
+};`,
+	);
+	return js.replace(/export default /g, "return ");
 }
 
 function walkJsFiles(dir, fn) {
