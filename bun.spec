@@ -51,6 +51,7 @@ Patch0:		bun-llvm-version.patch
 Patch1:		bun-offline.patch
 Patch2:		bun-codegen-async.patch
 Patch3:		bun-clang-void-lambda.patch
+Patch4:		bun-codegen-export-default.patch
 
 BuildRequires:	clang
 BuildRequires:	llvm
@@ -276,7 +277,11 @@ find build/release -name 'libJavaScriptCore.a' -o -name 'libWTF.a' -o -name 'lib
 
 %check
 %{buildroot}%{_bindir}/bun --version
-echo 'console.log("ok")' | %{buildroot}%{_bindir}/bun -e 'console.log("ok")'
+%{buildroot}%{_bindir}/bun -e 'console.log("ok")'
+# node:fs used to ship with a leftover `export default` inside the IIFE
+# (esbuild --format=esm vs bun's own bundler). That makes require("fs")
+# throw at builtin-compile time.
+%{buildroot}%{_bindir}/bun -e 'require("fs"); require("path"); require("module"); console.log("node-builtins-ok")'
 
 %files
 %license LICENSE.md

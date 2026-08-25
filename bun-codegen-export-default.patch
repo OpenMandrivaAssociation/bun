@@ -1,0 +1,12 @@
+--- a/src/codegen/bundle-modules.ts
++++ b/src/codegen/bundle-modules.ts
+@@ -260,6 +260,8 @@
+       .replace(/import.meta.require\((.*?)\)/g, (expr, specifier) => {
+         throw new Error(`Builtin Bundler: do not use import.meta.require() (in ${file_path}))`);
+       })
++      // esbuild --format=esm emits `export default require_X()`; bun's bundler
++      // would have turned that into the IIFE return value.
++      .replace(/export default /g, "return ")
+       .replace(/return \$\nexport /, "return")
+       .replace(/__intrinsic__/g, "@")
+       .replace(/__no_intrinsic__/g, "") + "\n";
