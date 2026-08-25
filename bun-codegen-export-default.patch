@@ -1,6 +1,6 @@
 --- a/src/codegen/bundle-modules.ts	2026-08-20 02:50:33.000000000 +0200
-+++ b/src/codegen/bundle-modules.ts	2026-08-25 07:43:40.232127211 +0200
-@@ -260,6 +260,9 @@
++++ b/src/codegen/bundle-modules.ts	2026-08-25 12:53:54.049002378 +0200
+@@ -260,8 +260,12 @@
        .replace(/import.meta.require\((.*?)\)/g, (expr, specifier) => {
          throw new Error(`Builtin Bundler: do not use import.meta.require() (in ${file_path}))`);
        })
@@ -9,4 +9,7 @@
 +      .replace(/export default /g, "return ")
        .replace(/return \$\nexport /, "return")
        .replace(/__intrinsic__/g, "@")
++      .replace(/"@undefined"/g, "@undefined")
        .replace(/__no_intrinsic__/g, "") + "\n";
+   captured = captured.replace(
+     /function\s*\(.*?\)\s*{/,

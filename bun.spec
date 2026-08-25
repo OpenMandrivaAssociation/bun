@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	4
+Release:	5
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
