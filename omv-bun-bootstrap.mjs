@@ -13,6 +13,7 @@ import {
 	readFileSync,
 	readdirSync,
 	statSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -316,6 +317,20 @@ function installBunGlobal() {
 			const h = createHash("sha1").update(s).digest();
 			return h.readBigUInt64BE(0);
 		},
+		zstdCompressSync(buf, opts) {
+			const level = (opts && opts.level) || 19;
+			const tmpIn = join(process.env.TMPDIR || "/tmp", "omv-zstd-in-" + process.pid + "-" + Date.now());
+			writeFileSync(tmpIn, buf);
+			const r = spawnSync("zstd", ["-" + Math.min(level, 19), "-c", tmpIn], {
+				encoding: null,
+				maxBuffer: 64 * 1024 * 1024,
+			});
+			try {
+				unlinkSync(tmpIn);
+			} catch {}
+			if (r.status !== 0) throw new Error(String(r.stderr || "zstd failed"));
+			return r.stdout;
+		},
 		inspect(value, opts) {
 			return nodeInspect(value, { colors: !!(opts && opts.colors), depth: 8, maxArrayLength: 50 });
 		},
@@ -341,6 +356,31 @@ function installBunGlobal() {
 			transformSync(source) {
 				return source;
 			}
+		},
+		$(strings, ...values) {
+			let cmd = "";
+			for (let i = 0; i < strings.length; i++) {
+				cmd += strings[i];
+				if (i < values.length) {
+					const v = values[i];
+					if (v && typeof v === "object" && v.raw != null) cmd += v.raw;
+					else cmd += v;
+				}
+			}
+			return {
+				text() {
+					return new Promise((resolve, reject) => {
+						const r = spawnSync("sh", ["-c", cmd], {
+							encoding: "utf8",
+							env: process.env,
+							maxBuffer: 64 * 1024 * 1024,
+						});
+						if (r.status !== 0) {
+							reject(new Error((r.stderr || r.stdout || "") + `\n[omv-bun $] ${cmd}`));
+						} else resolve(r.stdout || "");
+					});
+				},
+			};
 		},
 	};
 	BunObj.inspect.custom = nodeInspect.custom;
@@ -454,23 +494,42 @@ if (typeof globalThis.Bun === "undefined" || !globalThis.Bun.__omv) {
 
 // ── bun build CLI (codegen drives this via process.execPath) ───────────
 
+function bunDefineToEsbuild(spec) {
+	// bun: --define=KEY:VALUE or --define=KEY=VALUE  →  esbuild --define:KEY=VALUE
+	const colon = spec.indexOf(":");
+	const eq = spec.indexOf("=");
+	let key, val;
+	if (colon !== -1 && (eq === -1 || colon < eq)) {
+		key = spec.slice(0, colon);
+		val = spec.slice(colon + 1);
+	} else if (eq !== -1) {
+		key = spec.slice(0, eq);
+		val = spec.slice(eq + 1);
+	} else {
+		return "--define:" + spec;
+	}
+	return "--define:" + key + "=" + val;
+}
+
 function bunBuildCli(argv) {
 	const entries = [];
 	const args = [esbuildBin()];
 	let outdir = "";
 	let outfile = "";
 	let root = "";
+	let format = "";
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === "--minify") args.push("--minify");
 		else if (a === "--minify-syntax") args.push("--minify-syntax");
+		else if (a === "--minify-whitespace") args.push("--minify-whitespace");
 		else if (a === "--keep-names") args.push("--keep-names");
 		else if (a === "--target") {
 			const t = argv[++i];
-			args.push(t === "browser" ? "--platform=browser" : "--platform=neutral");
+			args.push(t === "browser" ? "--platform=browser" : t === "node" ? "--platform=node" : "--platform=neutral");
 		} else if (a.startsWith("--target=")) {
 			const t = a.slice("--target=".length);
-			args.push(t === "browser" ? "--platform=browser" : "--platform=neutral");
+			args.push(t === "browser" ? "--platform=browser" : t === "node" ? "--platform=node" : "--platform=neutral");
 		} else if (a === "--outdir") outdir = argv[++i];
 		else if (a.startsWith("--outdir=")) outdir = a.slice("--outdir=".length);
 		else if (a === "--outfile") outfile = argv[++i];
@@ -479,15 +538,16 @@ function bunBuildCli(argv) {
 		else if (a.startsWith("--root=")) root = a.slice("--root=".length);
 		else if (a === "--external") args.push("--external:" + argv[++i]);
 		else if (a.startsWith("--external=")) args.push("--external:" + a.slice("--external=".length));
-		else if (a === "--define") args.push("--define:" + argv[++i]);
-		else if (a.startsWith("--define=")) args.push("--define:" + a.slice("--define=".length));
-		else if (a === "--format") args.push("--format=" + argv[++i]);
-		else if (a.startsWith("--format=")) args.push(a);
+		else if (a.startsWith("--external:")) args.push(a);
+		else if (a === "--define") args.push(bunDefineToEsbuild(argv[++i]));
+		else if (a.startsWith("--define=")) args.push(bunDefineToEsbuild(a.slice("--define=".length)));
+		else if (a === "--format") format = argv[++i];
+		else if (a.startsWith("--format=")) format = a.slice("--format=".length);
 		else if (a.startsWith("-")) {
 			// ignore unknown bun-build flags
 		} else entries.push(a);
 	}
-	args.push(...entries, "--bundle", "--format=esm", "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
+	args.push(...entries, "--bundle", "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
 	if (outdir) args.push("--outdir=" + outdir);
 	if (outfile) args.push("--outfile=" + outfile);
 	if (root) args.push("--outbase=" + root);
@@ -553,8 +613,36 @@ async function cli() {
 		runTs(args);
 		return;
 	}
+	// bun run <name>: package.json script, or name.ts in cwd (build-fallbacks).
+	if (args[0] && !args[0].startsWith("-")) {
+		const name = args[0];
+		for (const ext of [".ts", ".tsx", ".js", ".mjs"]) {
+			if (existsSync(name + ext)) {
+				args[0] = name + ext;
+				runTs(args);
+				return;
+			}
+		}
+		if (existsSync("package.json")) {
+			try {
+				const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+				const script = pkg.scripts && pkg.scripts[name];
+				if (script) {
+					const parts = script.trim().split(/\s+/);
+					if (parts[0] === "bun") parts.shift();
+					await cliFrom(parts.concat(args.slice(1)));
+					return;
+				}
+			} catch {}
+		}
+	}
 	process.stderr.write(`omv-bun-bootstrap: unsupported invocation: bun ${args.join(" ")}\n`);
 	process.exit(1);
+}
+
+function cliFrom(argv) {
+	process.argv = [process.argv[0], process.argv[1], ...argv];
+	return cli();
 }
 
 // Main thread: either the bun CLI, or --import into a codegen script.

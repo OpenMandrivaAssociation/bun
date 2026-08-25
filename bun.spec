@@ -57,6 +57,7 @@ BuildRequires:	ninja
 BuildRequires:	make
 BuildRequires:	unifdef
 BuildRequires:	nasm
+BuildRequires:	zstd
 BuildRequires:	rust
 BuildRequires:	cargo
 BuildRequires:	nodejs
