@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	11
+Release:	12
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -295,10 +295,17 @@ rm -f "$_reqjs"
 # need --minify-syntax so dead $bundleError() is DCE'd. Builtins are
 # left unminified. --define Promise=__intrinsic__Promise must stay an
 # identifier (a quoted string made Symbol.species not a constructor).
+# Enum maps such as $LoaderLabelToId must stay object/array literals or
+# Bun.build plugins throw "Loader js is not supported".
 # typeof Bun.$ is not enough — the tagged template is the real test.
 %{buildroot}%{_bindir}/bun -e 'if (typeof Bun.$ !== "function") throw new Error("Bun.$ missing"); console.log("shell-ok")'
 %{buildroot}%{_bindir}/bun -e 'const out = await Bun.$`echo species-ok`.text(); if (!String(out).includes("species-ok")) throw new Error("Bun.$ output: "+out); console.log("shell-run-ok")'
 %{buildroot}%{_bindir}/bun -e 'const s=require("stream"); if (typeof s.Readable !== "function") throw new Error("stream.Readable missing"); console.log("stream-ok")'
+# $LoaderLabelToId must be an object, not a JSON string
+_loaderts=$(mktemp --suffix=.ts)
+echo 'export default 1' > "$_loaderts"
+%{buildroot}%{_bindir}/bun -e "const r=await Bun.build({entrypoints:['$_loaderts'],plugins:[{name:'t',setup(b){b.onLoad({filter:/.*/},()=>({contents:'export default 1',loader:'js'}))}}]}); if(!r.success) throw new Error(String(r.logs)); console.log('loader-ok')"
+rm -f "$_loaderts"
 
 %files
 %license LICENSE.md

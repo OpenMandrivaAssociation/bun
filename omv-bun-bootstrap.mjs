@@ -506,7 +506,9 @@ function asEsbuildDefineValue(v) {
 		t === "undefined" ||
 		/^["']/.test(t) ||
 		/^-?\d/.test(t) ||
-		/^[A-Za-z_$][\w$]*$/.test(t)
+		/^[A-Za-z_$][\w$]*$/.test(t) ||
+		// replacements.ts enums: $LoaderLabelToId = {"js":2,...}
+		/^[\[{]/.test(t)
 	) {
 		return t;
 	}
