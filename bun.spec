@@ -118,6 +118,12 @@ sed -i \
 	-e '/args.push(cargoBuildStdArg);/d' \
 	-e '/args.push("-Zbuild-std-features=panic-unwind,default");/d' \
 	scripts/build/rust.ts
+# clang 23: RETURN_IF_EXCEPTION({},) in void lambdas; highway SVE lacks
+# BitsFromMask; attribute-alias on highway_memmem vs memmem.
+sed -i \
+	-e 's/"-Werror",/"-Werror", "-Wno-error=return-type", "-Wno-error=attribute-alias",/' \
+	-e 's/"-Wno-character-conversion",/"-Wno-character-conversion", "-DHWY_DISABLED_TARGETS=(HWY_SVE|HWY_SVE2|HWY_SVE_256)",/' \
+	scripts/build/flags.ts
 
 # Cargo vendor (must not unpack over vendor/ — that is lolhtml/rust-argon2)
 tar -xf %{S:1}
