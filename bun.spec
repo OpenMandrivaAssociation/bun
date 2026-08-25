@@ -59,6 +59,7 @@ BuildRequires:	unifdef
 BuildRequires:	nasm
 BuildRequires:	zstd
 BuildRequires:	rust
+BuildRequires:	rust-src
 BuildRequires:	cargo
 BuildRequires:	nodejs
 BuildRequires:	esbuild
@@ -190,6 +191,20 @@ node --experimental-strip-types --no-warnings scripts/build.ts \
 	--lto=off \
 	--build-dir=build/release \
 	--configure-only
+
+# configure rewrites .cargo/config.toml with only linker lines. Restore
+# the crates.io → cargo-vendor replacement so --offline cargo can resolve.
+cat >> .cargo/config.toml << 'EOF'
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "cargo-vendor"
+
+[net]
+offline = true
+EOF
 
 ninja -C build/release -v
 
