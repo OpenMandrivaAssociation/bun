@@ -518,6 +518,11 @@ function bunBuildCli(argv) {
 	let outfile = "";
 	let root = "";
 	let format = "";
+	// --target bun is bun's builtin-module codegen. Official bun's bundler
+	// turns export default / $$EXPORT$$($) into an IIFE return. esbuild
+	// --bundle wraps the same file in __commonJS and then `return require_X()`
+	// yields mod.exports === {} (the callback's `return $` is ignored).
+	let targetBun = false;
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === "--minify") args.push("--minify");
@@ -526,9 +531,11 @@ function bunBuildCli(argv) {
 		else if (a === "--keep-names") args.push("--keep-names");
 		else if (a === "--target") {
 			const t = argv[++i];
+			if (t === "bun") targetBun = true;
 			args.push(t === "browser" ? "--platform=browser" : t === "node" ? "--platform=node" : "--platform=neutral");
 		} else if (a.startsWith("--target=")) {
 			const t = a.slice("--target=".length);
+			if (t === "bun") targetBun = true;
 			args.push(t === "browser" ? "--platform=browser" : t === "node" ? "--platform=node" : "--platform=neutral");
 		} else if (a === "--outdir") outdir = argv[++i];
 		else if (a.startsWith("--outdir=")) outdir = a.slice("--outdir=".length);
@@ -547,7 +554,8 @@ function bunBuildCli(argv) {
 			// ignore unknown bun-build flags
 		} else entries.push(a);
 	}
-	args.push(...entries, "--bundle", "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
+	args.push(...entries, "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
+	if (!targetBun) args.push("--bundle");
 	if (outdir) args.push("--outdir=" + outdir);
 	if (outfile) args.push("--outfile=" + outfile);
 	if (root) args.push("--outbase=" + root);
