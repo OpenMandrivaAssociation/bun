@@ -103,8 +103,12 @@ prebuilt bun or bun-webkit binaries published by upstream.
 # System rustc. The pin is a rustup nightly; ABF has no rustup and we
 # refuse to download one. RUSTC_BOOTSTRAP is set in the build phase.
 rm -f rust-toolchain.toml
-# Nightly-only lint; rustc 1.97 treats unknown lints as errors under -D warnings.
+# Nightly-only lint names (suspicious_runtime_symbol_definitions, …).
+# rustc 1.97 treats unknown lints as errors under -D warnings.
+sed -i 's/rustflags.push(`-Alinker_messages`);/rustflags.push(`-Alinker_messages`); rustflags.push("-Aunknown-lints");/' \
+	scripts/build/rust.ts
 sed -i '1a #![allow(unknown_lints)]' src/bun_core/lib.rs
+sed -i '1a #![allow(unknown_lints)]' src/sys/lib.rs
 # SHA shorter than 9 chars (tarball has no git) panics in const_str_slice.
 sed -i 's/if !build_options::SHA.is_empty()/if build_options::SHA.len() >= 9/' \
 	src/bun_core/env.rs
