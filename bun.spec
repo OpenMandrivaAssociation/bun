@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	7
+Release:	8
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -291,6 +291,11 @@ echo 'module.exports = 1' > "$_reqjs"
 rm -f "$_reqjs"
 # inspect used to ship with }) glued onto a trailing // comment
 %{buildroot}%{_bindir}/bun -e 'require("util").inspect({a:1}); console.log("inspect-ok")'
+# esbuild --keep-names injected a __name() helper that JSC builtins
+# (Bun.$, initializeNextTickQueue) and createBuiltinExecutable modules
+# (internal:streams/destroy) cannot see.
+%{buildroot}%{_bindir}/bun -e 'if (typeof Bun.$ !== "function") throw new Error("Bun.$ missing"); console.log("shell-ok")'
+%{buildroot}%{_bindir}/bun -e 'const s=require("stream"); if (typeof s.Readable !== "function") throw new Error("stream.Readable missing"); console.log("stream-ok")'
 
 %files
 %license LICENSE.md

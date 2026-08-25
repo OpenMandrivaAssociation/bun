@@ -233,7 +233,11 @@ function esbuildBuild(opts) {
 	if (opts.minify && typeof opts.minify === "object") {
 		if (opts.minify.syntax) args.push("--minify-syntax");
 		if (opts.minify.whitespace) args.push("--minify-whitespace");
-		if (opts.minify.keepNames) args.push("--keep-names");
+		// Official bun --keep-names only stops the minifier renaming
+		// functions. esbuild's flag also injects a __name() helper;
+		// JSC builtins (shell.ts, ProcessObjectInternals, …) and
+		// createBuiltinExecutable modules cannot see that helper.
+		if (opts.minify.keepNames && target !== "bun") args.push("--keep-names");
 	}
 	if (opts.define) {
 		for (const [k, v] of Object.entries(opts.define)) {
@@ -556,13 +560,14 @@ function bunBuildCli(argv) {
 	// --bundle wraps the same file in __commonJS and then `return require_X()`
 	// yields mod.exports === {} (the callback's `return $` is ignored).
 	let targetBun = false;
+	let keepNames = false;
 	const externals = [];
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === "--minify") args.push("--minify");
 		else if (a === "--minify-syntax") args.push("--minify-syntax");
 		else if (a === "--minify-whitespace") args.push("--minify-whitespace");
-		else if (a === "--keep-names") args.push("--keep-names");
+		else if (a === "--keep-names") keepNames = true;
 		else if (a === "--target") {
 			const t = argv[++i];
 			if (t === "bun") targetBun = true;
@@ -588,6 +593,8 @@ function bunBuildCli(argv) {
 			// ignore unknown bun-build flags
 		} else entries.push(a);
 	}
+	// --keep-names may appear before --target bun in argv (bundle-modules).
+	if (keepNames && !targetBun) args.push("--keep-names");
 	args.push(...entries, "--bundle", ...externals, "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
 	if (outdir) args.push("--outdir=" + outdir);
 	if (outfile) args.push("--outfile=" + outfile);
