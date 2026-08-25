@@ -70,8 +70,16 @@ for section in ("dependencies", "devDependencies", "resolutions"):
 p.write_text(json.dumps(pkg, indent=2) + "\n")
 PY
 	npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps
-	find node_modules -type f \( -name '*.node' -o -name '*.exe' -o -name 'esbuild' \) -delete
-	tar -cJf "$HERE/bun-${VERSION}-npm-vendor.tar.xz" node_modules
+	# Workspace packages bun-error and node-fallbacks have their own
+	# package.json deps (preact, browserify shims) used at codegen time.
+	(cd packages/bun-error && npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps)
+	(cd src/node-fallbacks && npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps)
+	find node_modules packages/bun-error/node_modules src/node-fallbacks/node_modules \
+		-type f \( -name '*.node' -o -name '*.exe' -o -name 'esbuild' \) -delete
+	tar -cJf "$HERE/bun-${VERSION}-npm-vendor.tar.xz" \
+		node_modules \
+		packages/bun-error/node_modules \
+		src/node-fallbacks/node_modules
 )
 
 echo "==> C dependency prefetch (github-archive + node headers)"

@@ -133,6 +133,12 @@ if [ -d "$wk" ] && [ "$wk" != "vendor/WebKit" ]; then
 	mv "$wk" vendor/WebKit
 fi
 
+# OptionsJSCOnly.cmake unconditionally sets ENABLE_API_TESTS ON on
+# non-Windows, which overrides -DENABLE_API_TESTS=OFF and then
+# add_subdirectory(ThirdParty/gtest) on a tree that does not ship gtest.
+sed -i 's/set(ENABLE_API_TESTS ON)/set(ENABLE_API_TESTS OFF)/' \
+	vendor/WebKit/Source/cmake/OptionsJSCOnly.cmake
+
 # Keep CMake FetchContent from trying the network (WebKit).
 # ENABLE_API_TESTS would pull gtest, which the slim tree does not ship.
 sed -i \

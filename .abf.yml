@@ -1,7 +1,7 @@
 sources:
   bun-1.4.0-cargo-vendor.tar.xz: e6da55fd34ad87f4415ac076f2eeeb418dd40d43
-  bun-1.4.0-npm-vendor.tar.xz: 4691722f9c2739b7b16fc96929a4a7941d90bba1
   bun-1.4.0-prefetch.tar.xz: eb73210c2bf17a88d1d93bfe792a58b2c024ff83
   bun-1.4.0.tar.gz: 09e050a720c1efdaf90bef3ae1d03d171e97b954
   node-v26.3.0-headers.tar.gz: 7aa1af65c08bfc3a4f17d2519dcb8c7873baa15e
   WebKit-jsc-only-0f966e81b78c84bb23213e391bc679c4ef83e56b.tar.xz: 24ced010fc3bc5c94291abbc6da2a58544ee2f99
+  bun-1.4.0-npm-vendor.tar.xz: c1eeffc313534cbeb5f6dd6429146e66744c50a9

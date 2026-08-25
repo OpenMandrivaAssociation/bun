@@ -538,7 +538,8 @@ async function cli() {
 		process.stderr.write("omv-bun-bootstrap: no arguments (build-time stub, not bun)\n");
 		process.exit(1);
 	}
-	if (args[0] === "install") process.exit(existsSync("node_modules") ? 0 : 1);
+	// ABF is offline; cargo/npm trees are pre-vendored. Never try the network.
+	if (args[0] === "install") process.exit(0);
 	if (args[0] === "--version" || args[0] === "-v" || args[0] === "--revision") {
 		process.stdout.write("1.4.0-bootstrap\n");
 		process.exit(0);
