@@ -511,6 +511,50 @@ function bunDefineToEsbuild(spec) {
 	return "--define:" + key + "=" + val;
 }
 
+// esbuild --bundle --format=esm wraps a bun builtin as:
+//   var require_X = __commonJS({ "file"(exports) { var $; ...; return $ } });
+//   export default require_X();
+// __commonJS ignores the callback return and yields mod.exports === {}.
+// Official bun's bundler just uses the inner body as the module factory.
+function unwrapEsbuildCommonJS(js) {
+	const end = js.search(/\n(?:export default |return )require_\w+\(\);\s*$/);
+	if (end < 0) return js.replace(/export default /g, "return ");
+	const marker = js.indexOf("__commonJS({");
+	if (marker < 0) return js.replace(/export default /g, "return ");
+	const args = js.indexOf("(exports)", marker);
+	if (args < 0) return js.replace(/export default /g, "return ");
+	const open = js.indexOf("{", args);
+	if (open < 0) return js.replace(/export default /g, "return ");
+	let depth = 0;
+	let close = -1;
+	let quote = "";
+	for (let i = open; i < end; i++) {
+		const c = js[i];
+		if (quote) {
+			if (c === "\\" ) { i++; continue; }
+			if (c === quote) quote = "";
+			continue;
+		}
+		if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
+		if (c === "{") depth++;
+		else if (c === "}") {
+			depth--;
+			if (depth === 0) { close = i; break; }
+		}
+	}
+	if (close <= open) return js.replace(/export default /g, "return ");
+	return js.slice(open + 1, close).trim() + "\n";
+}
+
+function walkJsFiles(dir, fn) {
+	if (!existsSync(dir)) return;
+	for (const ent of readdirSync(dir, { withFileTypes: true })) {
+		const p = join(dir, ent.name);
+		if (ent.isDirectory()) walkJsFiles(p, fn);
+		else if (p.endsWith(".js")) fn(p);
+	}
+}
+
 function bunBuildCli(argv) {
 	const entries = [];
 	const args = [esbuildBin()];
@@ -555,10 +599,7 @@ function bunBuildCli(argv) {
 			// ignore unknown bun-build flags
 		} else entries.push(a);
 	}
-	args.push(...entries, "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
-	if (!targetBun) {
-		args.push("--bundle", ...externals);
-	}
+	args.push(...entries, "--bundle", ...externals, "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
 	if (outdir) args.push("--outdir=" + outdir);
 	if (outfile) args.push("--outfile=" + outfile);
 	if (root) args.push("--outbase=" + root);
@@ -575,7 +616,9 @@ function bunBuildCli(argv) {
 			process.exit(r.status ?? 1);
 		}
 		if (existsSync(tmp)) {
-			process.stdout.write(readFileSync(tmp));
+			let out = readFileSync(tmp, "utf8");
+			if (targetBun) out = unwrapEsbuildCommonJS(out);
+			process.stdout.write(out);
 		}
 		process.exit(0);
 	}
@@ -583,6 +626,12 @@ function bunBuildCli(argv) {
 		stdio: ["inherit", "inherit", "inherit"],
 		maxBuffer: 64 * 1024 * 1024,
 	});
+	if (r.status === 0 && targetBun && outdir) {
+		walkJsFiles(outdir, p => {
+			const next = unwrapEsbuildCommonJS(readFileSync(p, "utf8"));
+			writeFileSync(p, next);
+		});
+	}
 	process.exit(r.status ?? 1);
 }
 
