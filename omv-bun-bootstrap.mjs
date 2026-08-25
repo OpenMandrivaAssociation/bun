@@ -231,13 +231,16 @@ function esbuildBuild(opts) {
 		/* keep names */
 	}
 	if (opts.minify && typeof opts.minify === "object") {
-		if (opts.minify.syntax) args.push("--minify-syntax");
-		if (opts.minify.whitespace) args.push("--minify-whitespace");
-		// Official bun --keep-names only stops the minifier renaming
-		// functions. esbuild's flag also injects a __name() helper;
-		// JSC builtins (shell.ts, ProcessObjectInternals, …) and
-		// createBuiltinExecutable modules cannot see that helper.
-		if (opts.minify.keepNames && target !== "bun") args.push("--keep-names");
+		// --target bun is JSC-builtin / createBuiltinExecutable codegen.
+		// esbuild --keep-names injects a __name() helper those functions
+		// cannot see; --minify-syntax without it breaks class extends
+		// Promise (ShellPromise[Symbol.species]). Official bun's bundler
+		// keeps names without a helper. We skip both flags.
+		if (target !== "bun") {
+			if (opts.minify.syntax) args.push("--minify-syntax");
+			if (opts.minify.whitespace) args.push("--minify-whitespace");
+			if (opts.minify.keepNames) args.push("--keep-names");
+		}
 	}
 	if (opts.define) {
 		for (const [k, v] of Object.entries(opts.define)) {
@@ -561,12 +564,15 @@ function bunBuildCli(argv) {
 	// yields mod.exports === {} (the callback's `return $` is ignored).
 	let targetBun = false;
 	let keepNames = false;
+	let minifySyntax = false;
+	let minifyWhitespace = false;
+	let minifyAll = false;
 	const externals = [];
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
-		if (a === "--minify") args.push("--minify");
-		else if (a === "--minify-syntax") args.push("--minify-syntax");
-		else if (a === "--minify-whitespace") args.push("--minify-whitespace");
+		if (a === "--minify") minifyAll = true;
+		else if (a === "--minify-syntax") minifySyntax = true;
+		else if (a === "--minify-whitespace") minifyWhitespace = true;
 		else if (a === "--keep-names") keepNames = true;
 		else if (a === "--target") {
 			const t = argv[++i];
@@ -593,8 +599,14 @@ function bunBuildCli(argv) {
 			// ignore unknown bun-build flags
 		} else entries.push(a);
 	}
-	// --keep-names may appear before --target bun in argv (bundle-modules).
-	if (keepNames && !targetBun) args.push("--keep-names");
+	// Flags may appear before --target bun (bundle-modules). Do not
+	// minify or inject __name helpers into JSC-builtin modules.
+	if (!targetBun) {
+		if (minifyAll) args.push("--minify");
+		if (minifySyntax) args.push("--minify-syntax");
+		if (minifyWhitespace) args.push("--minify-whitespace");
+		if (keepNames) args.push("--keep-names");
+	}
 	args.push(...entries, "--bundle", ...externals, "--format=" + (format || "esm"), "--loader:.svg=dataurl", "--loader:.png=dataurl", "--loader:.txt=text");
 	if (outdir) args.push("--outdir=" + outdir);
 	if (outfile) args.push("--outfile=" + outfile);
