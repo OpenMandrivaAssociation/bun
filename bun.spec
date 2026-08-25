@@ -103,6 +103,8 @@ prebuilt bun or bun-webkit binaries published by upstream.
 # System rustc. The pin is a rustup nightly; ABF has no rustup and we
 # refuse to download one. RUSTC_BOOTSTRAP is set in the build phase.
 rm -f rust-toolchain.toml
+# Nightly-only lint; rustc 1.97 treats unknown lints as errors under -D warnings.
+sed -i '1a #![allow(unknown_lints)]' src/bun_core/lib.rs
 # Use the distro libstd. -Zbuild-std rebuilds std and needs hashbrown
 # 0.17.1 (and more) that bun's Cargo.lock / our vendor do not pin.
 sed -i \
