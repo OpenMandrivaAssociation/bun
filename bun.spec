@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	6
+Release:	7
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -289,6 +289,8 @@ _reqjs=$(mktemp --suffix=.js)
 echo 'module.exports = 1' > "$_reqjs"
 %{buildroot}%{_bindir}/bun -e "if (require('$_reqjs') !== 1) throw new Error('require file failed')"
 rm -f "$_reqjs"
+# inspect used to ship with }) glued onto a trailing // comment
+%{buildroot}%{_bindir}/bun -e 'require("util").inspect({a:1}); console.log("inspect-ok")'
 
 %files
 %license LICENSE.md

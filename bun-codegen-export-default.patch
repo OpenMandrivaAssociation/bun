@@ -1,13 +1,19 @@
---- a/src/codegen/bundle-modules.ts	2026-08-20 02:50:33.000000000 +0200
-+++ b/src/codegen/bundle-modules.ts	2026-08-25 12:53:54.049002378 +0200
-@@ -260,8 +260,12 @@
-       .replace(/import.meta.require\((.*?)\)/g, (expr, specifier) => {
+--- a/src/codegen/bundle-modules.ts	2026-08-25 15:15:32.077866600 +0200
++++ b/src/codegen/bundle-modules.ts	2026-08-25 15:15:40.757629235 +0200
+@@ -249,7 +249,7 @@
+   const file_path = entrypoint.slice(TMP_DIR.length + 1).replace(/\.ts$/, ".js");
+   const file = Bun.file(path.join(TMP_DIR, "modules_out", file_path));
+   const output = await file.text();
+-  let captured = `(function (){${output.replace("// @bun\n", "").trim()}})`;
++  let captured = `(function (){${output.replace("// @bun\n", "").trim()}\n})`;
+   let usesDebug = output.includes("$debug_log");
+   let usesAssert = output.includes("$assert");
+   captured =
+@@ -261,7 +261,9 @@
          throw new Error(`Builtin Bundler: do not use import.meta.require() (in ${file_path}))`);
        })
-+      // esbuild --format=esm emits export default require_X(); bun's bundler
-+      // would have turned that into the IIFE return value.
-+      .replace(/export default /g, "return ")
        .replace(/return \$\nexport /, "return")
++      .replace(/export default /g, "return ")
        .replace(/__intrinsic__/g, "@")
 +      .replace(/"@undefined"/g, "@undefined")
        .replace(/__no_intrinsic__/g, "") + "\n";
