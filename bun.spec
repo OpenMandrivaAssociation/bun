@@ -105,6 +105,9 @@ prebuilt bun or bun-webkit binaries published by upstream.
 rm -f rust-toolchain.toml
 # Nightly-only lint; rustc 1.97 treats unknown lints as errors under -D warnings.
 sed -i '1a #![allow(unknown_lints)]' src/bun_core/lib.rs
+# SHA shorter than 9 chars (tarball has no git) panics in const_str_slice.
+sed -i 's/if !build_options::SHA.is_empty()/if build_options::SHA.len() >= 9/' \
+	src/bun_core/env.rs
 # Use the distro libstd. -Zbuild-std rebuilds std and needs hashbrown
 # 0.17.1 (and more) that bun's Cargo.lock / our vendor do not pin.
 sed -i \
@@ -181,6 +184,9 @@ export npm_config_ignore_scripts=true
 export GIT_TERMINAL_PROMPT=0
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_NOSYSTEM=1
+# No .git in the tarball. bun bakes GIT_SHA into a const and slices the
+# first 9 chars; "unknown" is only 7 and rustc const-eval panics.
+export GIT_SHA=0000000000000000000000000000000000000000
 
 # findBun() checks ~/.bun/bin/bun first. Put the bootstrap stub there
 # so configure never tries to download a previous bun. The .mjs copy is
@@ -201,6 +207,11 @@ node --experimental-strip-types --no-warnings scripts/build.ts \
 	--lto=off \
 	--build-dir=build/release \
 	--configure-only
+
+# configure writes SHA = "unknown" when git is missing (GIT_SHA can be
+# stripped from the mock env). Force a 40-char placeholder.
+sed -i 's/pub const SHA: \&str = "[^"]*"/pub const SHA: \&str = "0000000000000000000000000000000000000000"/' \
+	build/release/codegen/build_options.rs
 
 # configure rewrites .cargo/config.toml with only linker lines. Restore
 # the crates.io → cargo-vendor replacement so --offline cargo can resolve.
