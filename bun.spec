@@ -78,6 +78,10 @@ BuildRequires:	pkgconfig(openssl)
 BuildRequires:	pkgconfig(libuv)
 BuildRequires:	pkgconfig(sqlite3)
 BuildRequires:	git
+# bun defaults to -l:libatomic.a / -static-libstdc++; we link the
+# shared system copies instead (see --static-libatomic=off below).
+BuildRequires:	libatomic-devel
+BuildRequires:	libstdc++-devel
 
 # JSC is LGPLv2+ and is statically linked. Ship the static archive so a
 # user can rebuild JSC and relink bun.
@@ -122,10 +126,14 @@ sed -i \
 # clang 23: return {} in a void lambda is a hard error (not -Wreturn-type);
 # the six call sites are patched in bun-clang-void-lambda.patch (void()).
 # highway SVE lacks BitsFromMask; attribute-alias on highway_memmem vs memmem.
+# Official bun statically links libstdc++/libgcc so the binary does not
+# depend on the host C++ runtime. ABF buildroots do not ship those .a
+# files, so drop the flags and link the system shared libraries.
 sed -i \
 	-e 's/"-Werror=return-type",/"-Wno-return-type",/' \
 	-e 's/"-Werror",/"-Werror", "-Wno-error=return-type", "-Wno-error=attribute-alias",/' \
 	-e 's/"-Wno-character-conversion",/"-Wno-character-conversion", "-DHWY_COMPILE_ONLY_STATIC",/' \
+	-e 's/"-static-libstdc++", "-static-libgcc"//' \
 	scripts/build/flags.ts
 
 # Cargo vendor (must not unpack over vendor/ — that is lolhtml/rust-argon2)
@@ -218,6 +226,7 @@ node --experimental-strip-types --no-warnings scripts/build.ts \
 	--profile=release-local \
 	--webkit=local \
 	--lto=off \
+	--static-libatomic=off \
 	--build-dir=build/release \
 	--configure-only
 
