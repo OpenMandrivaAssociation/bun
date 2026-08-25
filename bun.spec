@@ -50,6 +50,7 @@ Source6:	omv-bun-bootstrap.mjs
 Patch0:		bun-llvm-version.patch
 Patch1:		bun-offline.patch
 Patch2:		bun-codegen-async.patch
+Patch3:		bun-clang-void-lambda.patch
 
 BuildRequires:	clang
 BuildRequires:	llvm
@@ -118,8 +119,9 @@ sed -i \
 	-e '/args.push(cargoBuildStdArg);/d' \
 	-e '/args.push("-Zbuild-std-features=panic-unwind,default");/d' \
 	scripts/build/rust.ts
-# clang 23: RETURN_IF_EXCEPTION({},) in void lambdas; highway SVE lacks
-# BitsFromMask; attribute-alias on highway_memmem vs memmem.
+# clang 23: return {} in a void lambda is a hard error (not -Wreturn-type);
+# the six call sites are patched in bun-clang-void-lambda.patch (void()).
+# highway SVE lacks BitsFromMask; attribute-alias on highway_memmem vs memmem.
 sed -i \
 	-e 's/"-Werror=return-type",/"-Wno-return-type",/' \
 	-e 's/"-Werror",/"-Werror", "-Wno-error=return-type", "-Wno-error=attribute-alias",/' \
