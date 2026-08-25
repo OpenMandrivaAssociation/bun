@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	10
+Release:	11
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -293,7 +293,8 @@ rm -f "$_reqjs"
 %{buildroot}%{_bindir}/bun -e 'require("util").inspect({a:1}); console.log("inspect-ok")'
 # JSC builtins cannot see esbuild's __name() helper. Modules still
 # need --minify-syntax so dead $bundleError() is DCE'd. Builtins are
-# left unminified so ShellPromise[Symbol.species] stays a constructor.
+# left unminified. --define Promise=__intrinsic__Promise must stay an
+# identifier (a quoted string made Symbol.species not a constructor).
 # typeof Bun.$ is not enough — the tagged template is the real test.
 %{buildroot}%{_bindir}/bun -e 'if (typeof Bun.$ !== "function") throw new Error("Bun.$ missing"); console.log("shell-ok")'
 %{buildroot}%{_bindir}/bun -e 'const out = await Bun.$`echo species-ok`.text(); if (!String(out).includes("species-ok")) throw new Error("Bun.$ output: "+out); console.log("shell-run-ok")'

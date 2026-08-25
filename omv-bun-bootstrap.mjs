@@ -244,15 +244,7 @@ function esbuildBuild(opts) {
 	}
 	if (opts.define) {
 		for (const [k, v] of Object.entries(opts.define)) {
-			let lit = v;
-			if (typeof v !== "string") lit = JSON.stringify(v);
-			else {
-				const t = v.trim();
-				if (!(t === "true" || t === "false" || t === "null" || t === "undefined" || /^["']/.test(t) || /^-?\d/.test(t))) {
-					lit = JSON.stringify(v);
-				}
-			}
-			args.push(`--define:${k}=${lit}`);
+			args.push(`--define:${k}=${asEsbuildDefineValue(v)}`);
 		}
 	}
 	if (opts.drop) {
@@ -500,6 +492,26 @@ if (typeof globalThis.Bun === "undefined" || !globalThis.Bun.__omv) {
 }
 
 // ── bun build CLI (codegen drives this via process.execPath) ───────────
+
+// bun --define Promise=__intrinsic__Promise must stay an identifier.
+// JSON.stringify turned it into the string "__intrinsic__Promise", so
+// ShellPromise[Symbol.species] returned a string (not a constructor).
+function asEsbuildDefineValue(v) {
+	if (typeof v !== "string") return JSON.stringify(v);
+	const t = v.trim();
+	if (
+		t === "true" ||
+		t === "false" ||
+		t === "null" ||
+		t === "undefined" ||
+		/^["']/.test(t) ||
+		/^-?\d/.test(t) ||
+		/^[A-Za-z_$][\w$]*$/.test(t)
+	) {
+		return t;
+	}
+	return JSON.stringify(v);
+}
 
 function bunDefineToEsbuild(spec) {
 	// bun: --define=KEY:VALUE or --define=KEY=VALUE  →  esbuild --define:KEY=VALUE
