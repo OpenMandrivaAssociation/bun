@@ -132,7 +132,9 @@ fi
 
 echo "==> JSC-only WebKit @ ${WEBKIT_VERSION}"
 # GitHub archive of oven-sh/WebKit is ~2G (422s or multi-hour). PORT=JSCOnly
-# only compiles JavaScriptCore + WTF + bmalloc + unifdef. Clone, slice, xz.
+# only compiles JavaScriptCore + WTF + bmalloc. Clone, slice, xz.
+# Source/cmake is WebKit's CMake modules (not the cmake binary).
+# Bundled ThirdParty/unifdef is omitted; USE_SYSTEM_UNIFDEF=ON.
 WK="$HERE/WebKit-jsc-only-${WEBKIT_VERSION}.tar.xz"
 if [ ! -f "$WK" ]; then
 	CLONE="$WORKDIR/webkit-clone"
@@ -142,7 +144,7 @@ if [ ! -f "$WK" ]; then
 		git -C "$CLONE" checkout --detach "$WEBKIT_VERSION"
 	fi
 	SLIM="$WORKDIR/webkit-jsc-only/WebKit"
-	mkdir -p "$SLIM/Source/ThirdParty"
+	mkdir -p "$SLIM/Source"
 	cp -a "$CLONE/CMakeLists.txt" "$SLIM/"
 	cp -a "$CLONE/Source/CMakeLists.txt" "$CLONE/Source/cmake" "$SLIM/Source/"
 	cp -a "$CLONE/Source/JavaScriptCore" "$CLONE/Source/WTF" "$CLONE/Source/bmalloc" "$SLIM/Source/"

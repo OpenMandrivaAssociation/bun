@@ -1,0 +1,169 @@
+--- a/src/codegen/bindgen.ts
++++ b/src/codegen/bindgen.ts
+@@ -6,6 +6,7 @@
+ // `src/jsc/bindings/GeneratedBindings.rs` (`bun_jsc::r#gen::<basename>`).
+ import assert from "node:assert";
+ import * as path from "node:path";
++import { pathToFileURL } from "node:url";
+ import {
+   ArgStrategyChildItem,
+   CodeWriter,
+@@ -1023,7 +1024,7 @@
+     files.set(sourceFile, file);
+   }
+ 
+-  const exports = import.meta.require(fileName);
++  const exports = await import(pathToFileURL(fileName).href);
+ 
+   // Mark all exported TypeImpl as reachable
+   for (let [key, value] of Object.entries(exports)) {
+--- a/src/codegen/bindgenv2/script.ts
++++ b/src/codegen/bindgenv2/script.ts
+@@ -1,6 +1,9 @@
+ #!/usr/bin/env bun
+ import * as helpers from "../helpers";
++import { pathToFileURL } from "node:url";
+ import { NamedType, Type } from "./internal/base";
++import * as omvOptional from "./internal/optional";
++(globalThis as any).__omvBindgenOptional = omvOptional;
+ 
+ const USAGE = `\
+ Usage: script.ts [options]
+@@ -18,15 +21,19 @@
+ let codegenPath: string;
+ let sources: string[];
+ 
+-function getNamedExports(): NamedType[] {
+-  return sources.flatMap(path => {
+-    const exports = import.meta.require(path);
+-    return Object.values(exports).filter(v => v instanceof NamedType);
+-  });
++async function getNamedExports(): Promise<NamedType[]> {
++  const out: NamedType[] = [];
++  for (const p of sources) {
++    const exports = await import(pathToFileURL(p).href);
++    out.push(...Object.values(exports).filter(v => v instanceof NamedType));
++  }
++  return out;
+ }
+ 
+ function getNamedDependencies(type: Type, result: Set<NamedType>): void {
++  if (!type || !type.dependencies) return;
+   for (const dependency of type.dependencies) {
++    if (!dependency) continue;
+     if (dependency instanceof NamedType) {
+       result.add(dependency);
+     }
+@@ -54,19 +61,19 @@
+ }
+ 
+ /** Must name every file generate() writes: the build declares these as the outputs of the generate step. */
+-function listOutputs(): void {
++async function listOutputs(): Promise<void> {
+   const outputs: string[] = [];
+-  for (const type of getNamedExports()) {
++  for (const type of await getNamedExports()) {
+     if (type.hasCppHeader) outputs.push(cppHeaderPath(type));
+     if (type.hasCppSource) outputs.push(cppSourcePath(type));
+   }
+   process.stdout.write(outputs.join(";"));
+ }
+ 
+-function generate(): void {
++async function generate(): Promise<void> {
+   const names = new Set<string>();
+ 
+-  const namedExports = getNamedExports();
++  const namedExports = await getNamedExports();
+   {
+     const namedDependencies = new Set<NamedType>();
+     for (const type of namedExports) {
+@@ -109,7 +116,7 @@
+   }
+ }
+ 
+-function main(): void {
++async function main(): Promise<void> {
+   const args = helpers.argParse(["command", "codegen-path", "sources", "help"]);
+   if (Object.keys(args).length === 0) {
+     process.stderr.write(USAGE);
+@@ -135,10 +142,10 @@
+ 
+   switch (command) {
+     case "list-outputs":
+-      listOutputs();
++      await listOutputs();
+       break;
+     case "generate":
+-      generate();
++      await generate();
+       break;
+     default:
+       if (typeof command === "string") {
+@@ -150,4 +157,4 @@
+   }
+ }
+ 
+-main();
++await main();
+--- a/src/codegen/generate-classes.ts
++++ b/src/codegen/generate-classes.ts
+@@ -1,6 +1,7 @@
+ // @ts-nocheck
+ import { existsSync, readFileSync } from "fs";
+ import path from "path";
++import { pathToFileURL } from "node:url";
+ import jsclasses from "./../jsc/bindings/js_classes";
+ import { InvalidThisBehavior, type ClassDefinition, type Field } from "./class-definitions";
+ import { writeIfNotChanged } from "./helpers";
+@@ -2430,7 +2431,7 @@
+   let errors = [];
+   for (const file of files) {
+     const filepath = path.resolve(file);
+-    const result = require(filepath);
++    const result = await import(pathToFileURL(filepath).href);
+     if (!(result?.default?.length ?? 0)) {
+       errors.push(
+         new TypeError(
+--- a/src/codegen/bindgen-lib-internal.ts
++++ b/src/codegen/bindgen-lib-internal.ts
+@@ -5,6 +5,7 @@
+ import { expect } from "bun:test";
+ import assert from "node:assert";
+ import * as path from "node:path";
++import { fileURLToPath } from "node:url";
+ import type { FuncOptions, t } from "./bindgen-lib";
+ 
+ export const src = path.join(import.meta.dirname, "../");
+@@ -864,6 +865,10 @@
+ }
+ 
+ function stackTraceFileName(line: string): string {
++  const urlMatch = /(file:\/\/[^\s:)]+)/.exec(line);
++  if (urlMatch) {
++    return fileURLToPath(urlMatch[1]).replaceAll("\\", "/");
++  }
+   const match = /(?:at\s+|\()(.:?[^:\n(\)]*)[^(\n]*$/i.exec(line);
+   assert(match, `Couldn't extract filename from stack trace line: ${line}`);
+   return match[1].replaceAll("\\", "/");
+--- a/src/codegen/bake-codegen.ts
++++ b/src/codegen/bake-codegen.ts
+@@ -118,6 +118,7 @@
+             return n;
+           })
+           .trim();
++        if (!names) names = in_names.join(",");
+         assert(names, "missing name");
+         const split_names = names.split(",").map(x => x.trim());
+         const out_names = Object.fromEntries(in_names.map((x, i) => [x, split_names[i]]));
+--- a/src/codegen/helpers.ts
++++ b/src/codegen/helpers.ts
+@@ -32,7 +32,7 @@
+ 
+ export function checkAscii(str: string) {
+   if (!isAscii(Buffer.from(str))) {
+-    throw new Error(`non-ascii character in string "${str}". this will not be a valid ASCIILiteral`);
++    str = str.replace(/[^\x00-\x7F]/g, ch => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0"));
+   }
+ 
+   return str;

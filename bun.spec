@@ -4,8 +4,8 @@
 # network during the rpm build.
 #
 # Bootstrap:
-#   * configure/codegen run under Node 22+ type-stripping
-#     (omv-bun-bootstrap.mjs stands in for the bun CLI)
+#   * configure/codegen run under Node + system esbuild
+#     (omv-bun-bootstrap.mjs stands in for the bun CLI and Bun.* APIs)
 #   * esbuild (packaged separately, built from Go source) bundles JS builtins
 #   * cargo crates, npm modules, C library snapshots and oven-sh/WebKit
 #     are all SourceN tarballs produced by vendor-sources.sh
@@ -18,11 +18,8 @@
 #   abb store bun-*.tar.gz bun-*-vendor-*.tar.xz WebKit-*.tar.gz \
 #       node-*-headers.tar.gz bun-*-prefetch.tar.xz
 #
-# Remaining known risks (iterate on these after the first mock build):
-#   * some src/codegen/*.ts scripts still call Bun.* APIs
-#   * rust-toolchain.toml wants nightly-2026-07-20; we delete it and use
-#     system rustc 1.97 with RUSTC_BOOTSTRAP=1
-#   * a few codegen scripts may need small node-compatibility patches
+# rust-toolchain.toml wants nightly-2026-07-20; we delete it and use
+# system rustc with RUSTC_BOOTSTRAP=1.
 
 Name:		bun
 Version:	1.4.0
@@ -40,13 +37,17 @@ Source2:	bun-%{version}-npm-vendor.tar.xz
 Source3:	bun-%{version}-prefetch.tar.xz
 # JSC-only slice of oven-sh/WebKit at WEBKIT_VERSION (see vendor-sources.sh).
 # Full WebKit is ~8G / 1.9G compressed; bun's PORT=JSCOnly only compiles
-# JavaScriptCore + WTF + bmalloc + unifdef (~110M / 9M xz).
+# JavaScriptCore + WTF + bmalloc (~110M / 9M xz). Source/cmake in that
+# tree is WebKit's own *.cmake modules (OptionsJSCOnly, WebKitMacros,
+# …), not a bundled cmake; the cmake and unifdef binaries are system
+# BuildRequires.
 Source4:	WebKit-jsc-only-0f966e81b78c84bb23213e391bc679c4ef83e56b.tar.xz
 # node headers bun embeds for process.versions / N-API (nodejs.org source)
 Source5:	https://nodejs.org/dist/v26.3.0/node-v26.3.0-headers.tar.gz
-Source6:	omv-bun-bootstrap.sh
+Source6:	omv-bun-bootstrap.mjs
 Patch0:		bun-llvm-version.patch
 Patch1:		bun-offline.patch
+Patch2:		bun-codegen-async.patch
 
 BuildRequires:	clang
 BuildRequires:	llvm
@@ -55,6 +56,7 @@ BuildRequires:	cmake
 BuildRequires:	ninja
 BuildRequires:	make
 BuildRequires:	unifdef
+BuildRequires:	nasm
 BuildRequires:	rust
 BuildRequires:	cargo
 BuildRequires:	nodejs
@@ -137,6 +139,8 @@ sed -i \
 	-e '/ENABLE_WEB_RTC: "OFF",/a\      FETCHCONTENT_FULLY_DISCONNECTED: "ON",' \
 	-e '/ENABLE_WEB_RTC: "OFF",/a\      ENABLE_API_TESTS: "OFF",' \
 	-e '/ENABLE_WEB_RTC: "OFF",/a\      USE_SYSTEM_UNIFDEF: "ON",' \
+	-e '/ENABLE_WEB_RTC: "OFF",/a\      USE_HEADER_MAPS: "OFF",' \
+	-e '/ENABLE_WEB_RTC: "OFF",/a\      ENABLE_TOOLS: "OFF",' \
 	scripts/build/deps/webkit.ts
 
 # Node headers prefetch: same by-url scheme. vendor-sources.sh also
@@ -161,12 +165,16 @@ export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_NOSYSTEM=1
 
 # findBun() checks ~/.bun/bin/bun first. Put the bootstrap stub there
-# so configure never tries to download a previous bun.
+# so configure never tries to download a previous bun. The .mjs copy is
+# what Node --import loads (extensionless files are not a stable ESM URL).
 mkdir -p "$HOME/.bun/bin"
+install -m0755 %{S:6} "$HOME/.bun/omv-bun-bootstrap.mjs"
 install -m0755 %{S:6} "$HOME/.bun/bin/bun"
 mkdir -p bootstrap-bin
 install -m0755 %{S:6} bootstrap-bin/bun
 export PATH="$PWD/bootstrap-bin:$PATH"
+export OMV_BUN_LOADER="$HOME/.bun/omv-bun-bootstrap.mjs"
+export OMV_BUN_STUB="$HOME/.bun/bin/bun"
 
 # Node 22.18+ / 26 type stripping. scripts/build.ts is TypeScript.
 node --experimental-strip-types --no-warnings scripts/build.ts \
