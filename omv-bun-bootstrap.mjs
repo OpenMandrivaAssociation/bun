@@ -543,7 +543,11 @@ function unwrapEsbuildCommonJS(js) {
 		}
 	}
 	if (close <= open) return js.replace(/export default /g, "return ");
-	return js.slice(open + 1, close).trim() + "\n";
+	let body = js.slice(open + 1, close).trim() + "\n";
+	// esbuild --define leftovers: empty __esm init fns live outside
+	// __commonJS. The calls are no-ops; without the helpers they throw.
+	body = body.replace(/init_define_intrinsic_\w+\(\);\s*/g, "");
+	return body;
 }
 
 function walkJsFiles(dir, fn) {
