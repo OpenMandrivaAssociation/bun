@@ -1,0 +1,10 @@
+--- a/src/codegen/bundle-functions.ts	2026-08-25 14:34:42.136768740 +0200
++++ b/src/codegen/bundle-functions.ts	2026-08-25 14:34:42.382445236 +0200
+@@ -330,6 +330,7 @@
+         )
+         .replace(/^\((async )?function\(/, "($1function (")
+         .replace(/__intrinsic__/g, "@")
++        .replace(/"@undefined"/g, "@undefined")
+         .replace(/__no_intrinsic__/g, "") + "\n";
+ 
+     const errors = [...finalReplacement.matchAll(/@bundleError\((.*)\)/g)];

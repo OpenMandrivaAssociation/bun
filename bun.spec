@@ -25,7 +25,7 @@
 
 Name:		bun
 Version:	1.4.0
-Release:	5
+Release:	6
 Summary:	JavaScript runtime, bundler, test runner and package manager
 Group:		Development/Other
 License:	MIT and LGPLv2+
@@ -52,6 +52,8 @@ Patch1:		bun-offline.patch
 Patch2:		bun-codegen-async.patch
 Patch3:		bun-clang-void-lambda.patch
 Patch4:		bun-codegen-export-default.patch
+Patch5:		bun-codegen-unquote-undefined.patch
+Patch6:		bun-resolve-undefined-paths.patch
 
 BuildRequires:	clang
 BuildRequires:	llvm
@@ -282,6 +284,11 @@ find build/release -name 'libJavaScriptCore.a' -o -name 'libWTF.a' -o -name 'lib
 # (esbuild --format=esm vs bun's own bundler). That makes require("fs")
 # throw at builtin-compile time.
 %{buildroot}%{_bindir}/bun -e 'const fs=require("fs"); if (typeof fs.readFileSync !== "function") throw new Error("fs.readFileSync missing, keys="+Object.keys(fs)); require("path"); const {createRequire}=require("module"); createRequire("/usr/bin/bun"); console.log("node-builtins-ok")'
+# require() of a real file (createRequire alone does not resolve)
+_reqjs=$(mktemp --suffix=.js)
+echo 'module.exports = 1' > "$_reqjs"
+%{buildroot}%{_bindir}/bun -e "if (require('$_reqjs') !== 1) throw new Error('require file failed')"
+rm -f "$_reqjs"
 
 %files
 %license LICENSE.md

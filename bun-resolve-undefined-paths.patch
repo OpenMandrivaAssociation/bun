@@ -1,0 +1,18 @@
+--- a/src/jsc/modules/NodeModuleModule.cpp	2026-08-25 14:34:52.044881361 +0200
++++ b/src/jsc/modules/NodeModuleModule.cpp	2026-08-25 14:34:52.227336837 +0200
+@@ -346,6 +346,15 @@
+ 
+         JSC::EncodedJSValue result;
+ 
++        // esbuild quotes bun's @undefined intrinsic as the string
++        // "@undefined". Treat that like a missing paths option.
++        if (pathsValue.isString()) {
++            auto s = pathsValue.toWTFString(globalObject);
++            RETURN_IF_EXCEPTION(scope, {});
++            if (s == "@undefined"_s)
++                pathsValue = JSC::jsUndefined();
++        }
++
+         // If paths are provided, use Bun__resolveSyncWithPaths
+         if (!pathsValue.isUndefinedOrNull()) {
+             // Node.js requires options.paths to be an array
