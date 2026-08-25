@@ -19,7 +19,9 @@
 #       node-*-headers.tar.gz bun-*-prefetch.tar.xz
 #
 # rust-toolchain.toml wants nightly-2026-07-20; we delete it and use
-# system rustc with RUSTC_BOOTSTRAP=1.
+# system rustc with RUSTC_BOOTSTRAP=1. -Zbuild-std is dropped so we
+# link the distro libstd instead of rebuilding it (that would need
+# extra crates bun's Cargo.lock does not pin).
 
 Name:		bun
 Version:	1.4.0
@@ -101,6 +103,12 @@ prebuilt bun or bun-webkit binaries published by upstream.
 # System rustc. The pin is a rustup nightly; ABF has no rustup and we
 # refuse to download one. RUSTC_BOOTSTRAP is set in the build phase.
 rm -f rust-toolchain.toml
+# Use the distro libstd. -Zbuild-std rebuilds std and needs hashbrown
+# 0.17.1 (and more) that bun's Cargo.lock / our vendor do not pin.
+sed -i \
+	-e '/args.push(cargoBuildStdArg);/d' \
+	-e '/args.push("-Zbuild-std-features=panic-unwind,default");/d' \
+	scripts/build/rust.ts
 
 # Cargo vendor (must not unpack over vendor/ — that is lolhtml/rust-argon2)
 tar -xf %{S:1}
