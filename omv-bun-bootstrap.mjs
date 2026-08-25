@@ -231,11 +231,11 @@ function esbuildBuild(opts) {
 		/* keep names */
 	}
 	if (opts.minify && typeof opts.minify === "object") {
-		// --target bun is JSC-builtin / createBuiltinExecutable codegen.
-		// esbuild --keep-names injects a __name() helper those functions
-		// cannot see; --minify-syntax without it breaks class extends
-		// Promise (ShellPromise[Symbol.species]). Official bun's bundler
-		// keeps names without a helper. We skip both flags.
+		// Bun.build({ target: "bun" }) is JSC-builtin codegen
+		// (bundle-functions / shell.ts). esbuild --keep-names injects
+		// a __name() helper those functions cannot see; --minify-syntax
+		// without it breaks `class ShellPromise extends Promise`.
+		// Builtins do not use $bundleError, so we can skip both flags.
 		if (target !== "bun") {
 			if (opts.minify.syntax) args.push("--minify-syntax");
 			if (opts.minify.whitespace) args.push("--minify-whitespace");
@@ -599,9 +599,12 @@ function bunBuildCli(argv) {
 			// ignore unknown bun-build flags
 		} else entries.push(a);
 	}
-	// Flags may appear before --target bun (bundle-modules). Do not
-	// minify or inject __name helpers into JSC-builtin modules.
-	if (!targetBun) {
+	// bundle-modules.ts: --minify-syntax DCE's dead $bundleError()
+	// (node/os endianness/type/machine). --keep-names would inject a
+	// __name() helper createBuiltinExecutable cannot see, so skip it.
+	if (targetBun) {
+		if (minifySyntax || minifyAll) args.push("--minify-syntax");
+	} else {
 		if (minifyAll) args.push("--minify");
 		if (minifySyntax) args.push("--minify-syntax");
 		if (minifyWhitespace) args.push("--minify-whitespace");
